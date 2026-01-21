@@ -1,0 +1,648 @@
+#!/bin/bash
+VERSION=1.6.3
+echo "DOCK v.$VERSION"
+echo "Help programm with docker"
+echo "Install whiptail [sudo apt install whiptail]"
+echo "Copy to project dir and run ./dock"
+echo 'Use UID and GID like [user: ${UID}:${GID}]'
+
+OPTION='?' 
+OPTION2='?' 
+
+##readonly UID=$(id -u) 
+export UID
+export GID=$(id -g)
+
+function checkOption2 {
+	if [ -z $OPTION2 ]; then
+		OPTION2='?' 
+	fi
+}
+
+function mainMenu {
+	OPTION=$(whiptail --title  "Система управления docker-compose $VERSION" --menu  "Команды" 20 60 11 \
+	"composeup" "Поднять compose" \
+	"composerestart" "Перезапустить compose" \
+	"composedown" "Остановить compose" \
+	"composeimages" "Список образов" \
+	"containers" "Контейнеры" \
+	"images" "Образы" \
+	"networks" "Сети" \
+	"volumes" "Тома" \
+	"editor" "Редактор" \
+	"infos" Информация \
+	"dockerfile" "Dockerfile" \
+	3>&1 1>&2 2>&3)
+}
+
+function networksMenu {
+	OPTION2=$(whiptail --title  "Сети" --menu  "Команды" 20 60 10 \
+	"ls" "Список сетей" \
+	"inspect" "Информация о сети" \
+	"rm" "Удаление сети" \
+	3>&1 1>&2 2>&3)
+}
+
+function dockerfileMenu {
+	OPTION2=$(whiptail --title  "Система управения docker $VERSION" --menu  "Команды" 20 60 10 \
+	"build" "Собрать из Dockerfile" \
+	3>&1 1>&2 2>&3)
+}
+
+function imagesMenu {
+	OPTION2=$(whiptail --title  "Образы" --menu  "Команды" 20 60 10 \
+	"images" "Список всех образов" \
+	"rmimage" "Удалить образ" \
+	3>&1 1>&2 2>&3)
+}
+
+function infosMenu {
+	OPTION2=$(whiptail --title  "Система управения docker $VERSION" --menu  "Команды" 20 60 10 \
+	"info" "Информация" \
+	"version" "Версия" \
+	3>&1 1>&2 2>&3)
+}
+
+function containersMenu {
+	OPTION2=$(whiptail --title  "Контейнеры" --menu  "Команды" 20 60 10 \
+	"ps" "Список контейнеров" \
+	"psshort" "Список контейнеров (ID NAME)" \
+	"psa" "Список ВСЕХ контейнеров" \
+	"logs" "Лог контейнера" \
+	"logsa" "Лог OFF контейнеров" \
+	"stop" "Остановить контейнер" \
+	"bash" "Bash в контейнере" \
+	"rm" "Удалить контейнер" \
+	"rma" "Удалить OFF контейнер" \
+	3>&1 1>&2 2>&3)
+}
+
+function volumesMenu {
+	OPTION2=$(whiptail --title  "Тома" --menu  "Команды" 20 60 10 \
+	"ls" "Список томов" \
+	"inspect" "Информация о томе" \
+	3>&1 1>&2 2>&3)
+}
+
+function pressKey {
+	read -sn 1 -p 'Press any key to continue...';echo
+}
+
+function rmContainer {
+	path1=$1
+	res=""
+	for entry in $path1
+	do
+		ID=$(echo $entry | cut -d ":" -f 1)
+		NAME=$(echo $entry | cut -d ":" -f 2)
+		res=${res}${ID}" "${NAME}" OFF "
+	done
+	
+	DISTROS=$(whiptail --title  "Выбор контейнера" --radiolist \
+	"Выберите контейнер?" 25 85 18 $res 3>&1 1>&2 2>&3)
+	exitstatus=$?
+
+	if [ "$DISTROS" ];  then
+		docker rm $DISTROS
+	fi
+}
+
+function logContainer {
+	path1=$1
+	res=""
+	for entry in $path1
+	do
+		ID=$(echo $entry | cut -d ":" -f 1)
+		NAME=$(echo $entry | cut -d ":" -f 2)
+		res=${res}${ID}" "${NAME}" OFF "
+	done
+	
+	DISTROS=$(whiptail --title  "Выбор контейнера" --radiolist \
+	"Выберите контейнер?" 25 85 18 $res 3>&1 1>&2 2>&3)
+	exitstatus=$?
+
+	if [ "$DISTROS" ];  then
+		docker logs $DISTROS
+	fi
+}
+
+#### Editor functions
+
+function editorMenu {
+	OPTION2=$(whiptail --title  "Редактор" --menu  "Команды" 20 60 10 \
+	"new" "Новый build" \
+	"add" "Добавить сервис" \
+	"cat" "Посмотреть результат" \
+	"save" "Сохранить" \
+	3>&1 1>&2 2>&3)
+}
+
+function parse_yaml {
+	local prefix=$2
+	local s='[[:space:]]*' w='[a-zA-Z0-9_]*'
+	fs=$(echo @|tr @ '\034') # Use a non-printable character as field separator
+
+	echo `sed -ne "s|^\\($s\\):|\\1|" \
+			-e "s|^\\($s\\)\\($w\\)$s:$s[\\\"\']\\(.*\\)[\\\"\']$s\\$|\\1$fs\\2$fs\\3|p" \
+			-e "s|^\\($s\\)\\($w\\)$s:$s\\(.*\\)$s\\$|\\1$fs\\2$fs\\3|p" $1 `
+	#awk -F$fs '{
+#			indent = length($1)/2;
+#			vname[indent] = $2;
+#			for (i in vname) {if (i > indent) {delete vname[i]}}
+#			if (length($3) > 0) {
+#					vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+#					echo "$prefix$2="$3
+#					printf("%s%s%s=\"%s\"\\n", "'$prefix'",vn, $2, $3);
+#			}
+#	}'
+}
+
+function parse_yaml_original {
+    local prefix=$2
+    local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+
+    sed -ne "s|^\($s\):|\1|" \
+        -e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+    awk -F$fs '{
+        indent = length($1)/2;
+        vname[indent] = $2;
+        for (i in vname) {if (i > indent) {delete vname[i]}}
+        if (length($3) > 0) {
+            vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+	          printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+        }
+    }'
+}
+
+buildFileName="build.yml"
+
+function newCompose {
+	echo "services:" > $buildFileName
+	echo "Файл $buildFileName обновлен"
+#	echo "New"
+ # eval $(parse_yaml_original "sample/docker-compose.yml" "COM_")
+#	echo $COM_services_haproxy_container_name
+}
+
+function catBuild {
+	cat $buildFileName
+}
+
+function saveBuild {
+	if (whiptail --title  "Сохранить build? " --yesno  "Старый файл docker-compose.yml будет стерт. Да или нет" 10 60)  then
+		cp $buildFileName docker-compose.yml
+		echo "Изменения сохранены в docker-compose.yml"
+	fi
+}
+
+function addServiceSlot {
+	slotTitle=$1
+	slotVal=$2
+	slotDefault=$3
+	slotOffset=$4
+
+  #echo $slotTitle
+	slot=$(whiptail --title "$slotTitle" --inputbox "$slotVal" 10 60 "$slotDefault" 3>&1 1>&2 2>&3)
+	exitstatus=$?
+	if [ $exitstatus = 0 ];  then
+		echo "$slotOffset$slotVal: $slot" >> $buildFileName
+	else
+		echo "Error code slot $slotVal" $exitstatus
+		##return
+	fi
+}
+
+function addServiceEnv {
+	slotTitle=$1
+	slotVal=$2
+	slotDefault=$3
+	slotOffset=$4
+	if (whiptail --title  "Добавить переменную environment?" --yesno  "Да или нет" 10 60)  then
+	  echo "${slotOffset}environment:" >> $buildFileName
+	else
+		return
+	fi
+  exitstatus=0
+	while [ $exitstatus = 0 ] 
+	do
+		ask=$(whiptail --title "$slotTitle" --inputbox "$slotVal" 10 60 "$slotDefault" 3>&1 1>&2 2>&3)
+		exitstatus="$?"
+		echo "Переменная ${ask} добавлена" 
+		pressKey
+	  if [ $exitstatus = 0 ]; then
+			 echo "$slotOffset  - $ask" >> $buildFileName
+		fi
+	done
+}
+
+function addServicePorts {
+	slotTitle=$1
+	slotVal=$2
+	slotDefault=$3
+	slotOffset=$4
+	if (whiptail --title  "Добавить порты?" --yesno  "Да или нет" 10 60)  then
+	  echo "${slotOffset}ports:" >> $buildFileName
+	else
+		return
+	fi
+  exitstatus=0
+	while [ $exitstatus = 0 ] 
+	do
+		ask=$(whiptail --title "$slotTitle" --inputbox "$slotVal" 10 60 "$slotDefault" 3>&1 1>&2 2>&3)
+		exitstatus="$?"
+		echo "Порт ${ask} добавлен" 
+		pressKey
+	  if [ $exitstatus = 0 ]; then
+			 echo "$slotOffset  - $ask" >> $buildFileName
+		fi
+	done
+}
+
+function addServiceVolumes {
+	slotTitle=$1
+	slotVal=$2
+	slotDefault=$3
+	slotOffset=$4
+	if (whiptail --title  "Добавить Volumes?" --yesno  "Да или нет" 10 60)  then
+	  echo "${slotOffset}volumes:" >> $buildFileName
+	else
+		return
+	fi
+  exitstatus=0
+	while [ $exitstatus = 0 ] 
+	do
+		ask=$(whiptail --title "$slotTitle" --inputbox "$slotVal" 10 60 "$slotDefault" 3>&1 1>&2 2>&3)
+		exitstatus="$?"
+		echo "Volume ${ask} добавлен" 
+		pressKey
+	  if [ $exitstatus = 0 ]; then
+			 echo "$slotOffset  - $ask" >> $buildFileName
+		fi
+	done
+}
+
+function addService {
+	##echo "services:" > build.yml
+	if [ ! -f "$buildFileName" ]; then
+		echo "services:" > $buildFileName
+	fi
+
+	fileName=$buildFileName
+	of="    "
+
+	name=$(whiptail --title  "Название сервиса" --inputbox  "Название" 10 60 service_name 3>&1 1>&2 2>&3)
+	exitstatus=$?
+	if [ $exitstatus = 0 ];  then
+		echo $fileName
+#		echo "services:" > $fileName
+		echo "  "$name":" >> $fileName
+	else
+		echo "Error?? code" $exitstatus
+		return
+	fi
+
+	build=$(whiptail --title  "Сборка сервиса" --inputbox  "build" 10 60 . 3>&1 1>&2 2>&3)
+	exitstatus=$?
+	if [ $exitstatus = 0 ];  then
+		echo "    build:" $build >> $fileName
+		if [ -z $build ]; then
+			addServiceSlot "Имя файла сборки" "Dockerfile" "DockerfileName" "      "
+		fi
+	else
+		if (whiptail --title  "Выбрать образ сервиса?" --yesno  "Да или нет" 10 60)  then
+				path1=$(docker images --format '{{.ID}}@{{.Repository}}:{{.Tag}}')
+				res=""
+				for entry in $path1
+				do
+					ID=$(echo $entry | cut -d "@" -f 1)
+					NAME=$(echo $entry | cut -d "@" -f 2)
+					res="${res}${NAME} ${ID} OFF "
+				done
+				image=$(whiptail --title  "Выбор образа" --radiolist "Выберите проект?" 25 85 18 $res 3>&1 1>&2 2>&3)
+				if [ "$image" ];  then
+					echo "${of}image: ${image}" >> $buildFileName
+				fi
+		else
+			addServiceSlot "Образ сервиса" "image" "none" "$of"
+		fi
+	fi
+
+	addServiceSlot "Имя контейнера" "container_name" "container_name" "$of"
+	addServicePorts "Добавить порт?" "host_post:container_post" "80:80" "$of"
+	addServiceVolumes "Добавить volume?" "host_volume:container_volume" "./source:/dist" "$of"
+	addServiceEnv "Добавить переменную environment?" "name=value" "name=value" "$of"
+
+	if (whiptail --title  "Добавить особые параметры?" --yesno  "Да или нет" 10 60)  then
+		addServiceSlot "Перезапуск контейнера" "restart" "unless-stopped" "$of"
+		addServiceSlot "Включить консоль" "tty" "true" "$of"
+		addServiceSlot "Включить stdin_open" "stdin_open" "true" "$of"
+	fi
+
+
+	echo "Done. Ok."
+}
+
+function editorFunction {
+	arg=$1
+	echo $arg
+	if [ $arg = "new" ]; then
+		newCompose
+	fi
+
+	if [ $arg = "add" ]; then
+		addService
+	fi
+
+	if [ $arg = "cat" ]; then
+		catBuild
+	fi
+
+	if [ $arg = "save" ]; then
+		saveBuild
+	fi
+}
+#####################
+
+curdir=$(pwd)
+
+function main {
+
+	estatus=0
+	##echo $curdir
+	while [ $estatus = 0 ]
+	do
+		mainMenu
+		estatus=$?
+		##echo "Статус операции "$estatus		
+		if [ $estatus = 1 ];  then
+			exit
+		fi
+
+		if [ $OPTION = "editor" ];  then
+			editorMenu
+			checkOption2
+
+			editorFunction "$OPTION2"
+			pressKey
+			continue
+		fi
+
+		if [ $OPTION = "volumes" ];  then
+			volumesMenu
+			checkOption2
+
+			if [ $OPTION2 = "ls" ];  then
+				docker volume ls
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "inspect" ];  then
+				path1=$(docker volume ls --format '{{.Driver}}:{{.Name}}')
+				for entry in $path1
+				do
+					ID=$(echo $entry | cut -d ":" -f 1)
+					NAME=$(echo $entry | cut -d ":" -f 2)
+					res=${res}${NAME}" "${ID}" OFF "
+				done
+
+				DISTROS=$(whiptail --title  "Выбор тома" --radiolist \
+				"Выберите том?" 25 85 18 $res 3>&1 1>&2 2>&3)
+				exitstatus=$?
+				
+				if [ "$DISTROS" ];  then
+					docker volume inspect $DISTROS
+					pressKey
+					continue
+				fi
+			fi
+		fi
+
+		if [ $OPTION = "networks" ];  then
+			networksMenu
+			checkOption2
+			##docker ps
+			if [ $OPTION2 = "ls" ];  then
+				docker network ls
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "inspect" ];  then
+				path1=$(docker network ls --format '{{.ID}}:{{.Name}}')
+				res=""
+				for entry in $path1
+				do
+					ID=$(echo $entry | cut -d ":" -f 1)
+					NAME=$(echo $entry | cut -d ":" -f 2)
+					res=${res}${ID}" "${NAME}" OFF "
+				done
+				
+				DISTROS=$(whiptail --title  "Выбор сети" --radiolist \
+				"Выберите сеть?" 25 85 18 $res 3>&1 1>&2 2>&3)
+				exitstatus=$?
+
+				docker network inspect $DISTROS
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "rm" ];  then
+				path1=$(docker network ls --format '{{.ID}}:{{.Name}}')
+				res=""
+				for entry in $path1
+				do
+					ID=$(echo $entry | cut -d ":" -f 1)
+					NAME=$(echo $entry | cut -d ":" -f 2)
+					res=${res}${ID}" "${NAME}" OFF "
+				done
+				
+				DISTROS=$(whiptail --title  "Выбор сети" --radiolist \
+				"Выберите сеть для удаления?" 25 85 18 $res 3>&1 1>&2 2>&3)
+				exitstatus=$?
+
+				docker network rm $DISTROS
+				pressKey
+				continue
+			fi
+		fi
+
+		if [ $OPTION = "containers" ];  then
+			containersMenu
+			checkOption2
+			if [ $OPTION2 = "ps" ];  then
+				docker ps
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "psa" ];  then
+				docker ps -a
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "psshort" ];  then
+				docker ps --format '{{.ID}} {{.Names}}'
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "stop" ];  then
+				path1=$(docker ps --format '{{.Names}}')
+				res=""
+				for entry in $path1
+				do
+					res=${res}${entry}" "${entry}" OFF "
+				done
+				
+				DISTROS=$(whiptail --title  "Выбор контейнера" --radiolist \
+				"Выберите контейнер?" 25 85 18 $res 3>&1 1>&2 2>&3)
+				exitstatus=$?
+
+				docker stop $DISTROS
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "rm" ];  then
+				path1=$(docker ps --format '{{.ID}}:{{.Names}}')
+				rmContainer "$path1"
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "rma" ];  then
+				path1=$(docker ps -a --format '{{.ID}}:{{.Names}}')
+				rmContainer "$path1"
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "logs" ];  then
+				path1=$(docker ps --format '{{.ID}}:{{.Names}}')
+				logContainer "$path1"
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "logsa" ];  then
+				path1=$(docker ps -a --format '{{.ID}}:{{.Names}}')
+				logContainer "$path1"
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "bash" ];  then
+				path1=$(docker-compose ps --format '{{.Service}}:{{.Names}}')
+				res=""
+				for entry in $path1
+				do
+					ID=$(echo $entry | cut -d ":" -f 1)
+					NAME=$(echo $entry | cut -d ":" -f 2)
+					res=${res}${ID}" "${NAME}" OFF "
+				done
+				
+				DISTROS=$(whiptail --title  "Выбор сервиса" --radiolist \
+				"Выберите сервис?" 25 85 18 $res 3>&1 1>&2 2>&3)
+				exitstatus=$?
+
+				if [ "$DISTROS" ];  then
+					docker-compose exec $DISTROS bash 
+				fi
+
+				pressKey
+				continue
+			fi
+			##echo $OPTION2
+			##pressKey
+			continue
+		fi
+
+		if [ $OPTION = "composeup" ];  then
+			##env UID=${UID} GID=${GID} 
+			docker-compose up -d
+			exit
+			continue
+		fi
+
+		if [ $OPTION = "composerestart" ];  then
+			docker-compose restart
+			exit
+			continue
+		fi
+
+		if [ $OPTION = "composedown" ];  then
+			docker-compose down 
+			exit
+			continue
+		fi
+
+		if [ $OPTION = "composeimages" ];  then
+				docker compose images
+				pressKey
+				continue
+		fi
+
+		if [ $OPTION = "dockerfile" ];  then
+			dockerfileMenu
+			checkOption2
+			if [ $OPTION2 = "build" ];  then
+				docker build - < Dockerfile 
+				exit
+				continue
+			fi
+			continue
+		fi
+		
+		if [ $OPTION = "infos" ];  then
+			infosMenu
+			checkOption2
+			if [ $OPTION2 = "info" ] || [ $OPTION2 = "version" ];  then
+				docker $OPTION2
+				pressKey
+				continue
+			fi
+			continue
+		fi
+
+		if [ $OPTION = "images" ];  then
+			imagesMenu
+			checkOption2
+			if [ $OPTION2 = "images" ];  then
+				docker images
+				pressKey
+				continue
+			fi
+
+			if [ $OPTION2 = "rmimage" ];  then
+				#docker rm images
+				#docker images --format {{.ID}}
+				#path1=$(docker images --format '{{.ID}}')
+				path1=$(docker images --format '{{.ID}}:"{{.Repository}}-{{.Tag}}"')
+				res=""
+				for entry in $path1
+				do
+					ID=$(echo $entry | cut -d ":" -f 1)
+					NAME=$(echo $entry | cut -d ":" -f 2)
+					res=${res}${ID}" "${NAME}" OFF "
+				done
+				
+				DISTROS=$(whiptail --title  "Выбор образа" --radiolist \
+				"Выберите проект?" 25 85 18 $res 3>&1 1>&2 2>&3)
+				exitstatus=$?
+
+				if [ "$DISTROS" ];  then
+					docker image rm $DISTROS
+				fi
+
+				##pressKey
+				continue
+			fi
+		fi
+		##mainFunctions
+	done
+}
+
+main 

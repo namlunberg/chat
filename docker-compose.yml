@@ -1,0 +1,50 @@
+version: '3.8'
+services:
+    db:
+      image: postgres:16
+      environment:
+        POSTGRES_USER: user
+        POSTGRES_PASSWORD: user
+        PGDATA: /data/postgres
+        POSTGRES_DB: bank
+      volumes:
+        - db:/data/postgres
+      ports:
+        - "5333:5432"
+      restart: unless-stopped
+      healthcheck:
+        test: [ "CMD-SHELL", "pg_isready -d postgres" ]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+    php-fpm:
+        build:
+            dockerfile: docker/Dockerfile
+            context: ./
+            target: php_fpm
+            args:
+                - XDEBUG
+        container_name: ${PROJECT_NAME}-php
+        environment:
+            PHP_IDE_CONFIG: "serverName=localhost"
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        volumes:
+            - ./app:/app
+        depends_on:
+            - db
+        restart: unless-stopped
+    nginx:
+        image: nginx:stable-alpine
+        container_name: ${PROJECT_NAME}-nginx
+        volumes:
+            - ./app/public:/app/public
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+            - ./docker/nginx/htpasswd:/etc/nginx/htpasswd
+        ports:
+            - "8070:80"
+        restart: unless-stopped
+
+volumes:
+  db:
+
