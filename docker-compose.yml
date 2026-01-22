@@ -1,7 +1,7 @@
 version: '3.8'
 services:
     db:
-      image: postgres:16
+      image: postgres:18-bookworm
       environment:
         POSTGRES_USER: user
         POSTGRES_PASSWORD: user
@@ -27,8 +27,6 @@ services:
         container_name: ${PROJECT_NAME}-php
         environment:
             PHP_IDE_CONFIG: "serverName=localhost"
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
         volumes:
             - ./app:/app
         depends_on:
