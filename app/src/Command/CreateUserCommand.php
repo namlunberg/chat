@@ -8,6 +8,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Console\Input\InputArgument;
 
 #[AsCommand(name: 'app:create-user', description: 'Creates a new user.')]
 class CreateUserCommand extends Command
@@ -22,12 +23,29 @@ class CreateUserCommand extends Command
         $this->passwordHasher = $passwordHasher;
     }
 
+    protected function configure(): void
+    {
+        $this
+            ->addArgument('email', InputArgument::REQUIRED, 'Email пользователя')
+            ->addArgument('password', InputArgument::REQUIRED, 'Пароль пользователя');
+    }
+
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        
+        $email = $input->getArgument('email');
+        $plainPassword = $input->getArgument('password');
+
+        $existingUser = $this->entityManager->getRepository(User::class)->findOneBy(['email' => $email]);
+        if ($existingUser) {
+            $output->writeln('<error>Такой пользователь уже существет</error>');
+            return Command::FAILURE;
+        }
+
         $user = new User();
-        $user->setEmail('admin2@example.com');
+        $user->setEmail($email);
         $user->setRoles(['ROLE_ADMIN']);
-        $plainPassword = 'qwerty';
 
         $hashedPassword = $this->passwordHasher->hashPassword(
             $user,
@@ -38,7 +56,7 @@ class CreateUserCommand extends Command
         $this->entityManager->persist($user);
         $this->entityManager->flush();
 
-        $output->writeln('Created user: admin2@example.com');
+        $output->writeln('Created user: ' . $email);
 
         return Command::SUCCESS;
     }
