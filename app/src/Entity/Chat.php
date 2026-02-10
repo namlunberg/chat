@@ -6,8 +6,9 @@ use App\Repository\ChatRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use App\Entity\User;
+use DateTimeImmutable;
 
+#[ORM\HasLifecycleCallbacks] 
 #[ORM\Entity(repositoryClass: ChatRepository::class)]
 class Chat
 {
@@ -16,15 +17,14 @@ class Chat
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column]
-    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'chat')]
+    #[ORM\ManyToOne(inversedBy: 'chats')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?User $user = null;
+    private ?User $owner = null;
 
-    #[ORM\Column(nullable: true)]
+    #[ORM\Column]
     private ?\DateTimeImmutable $created_at = null;
 
-    #[ORM\Column(nullable: true)]
+    #[ORM\Column]
     private ?\DateTimeImmutable $updated_at = null;
 
     /**
@@ -43,14 +43,14 @@ class Chat
         return $this->id;
     }
 
-    public function getUser(): ?User
+    public function getOwner(): ?User
     {
-        return $this->user;
+        return $this->owner;
     }
 
-    public function setUser(?User $user): static
+    public function setOwner(?User $owner): static
     {
-        $this->user = $user;
+        $this->owner = $owner;
 
         return $this;
     }
@@ -60,7 +60,7 @@ class Chat
         return $this->created_at;
     }
 
-    public function setCreatedAt(?\DateTimeImmutable $created_at): static
+    public function setCreatedAt(\DateTimeImmutable $created_at): static
     {
         $this->created_at = $created_at;
 
@@ -72,7 +72,7 @@ class Chat
         return $this->updated_at;
     }
 
-    public function setUpdatedAt(?\DateTimeImmutable $updated_at): static
+    public function setUpdatedAt(\DateTimeImmutable $updated_at): static
     {
         $this->updated_at = $updated_at;
 
@@ -107,5 +107,19 @@ class Chat
         }
 
         return $this;
+    }
+
+    #[ORM\PrePersist]
+    public function setCreatedAtValue(): void
+    {
+        $this->created_at = new DateTimeImmutable();
+        // Optional: also set updated_at at the same time
+        $this->setUpdatedAtValue();
+    }
+
+    #[ORM\PreUpdate]
+    public function setUpdatedAtValue(): void
+    {
+        $this->updated_at = new DateTimeImmutable();
     }
 }

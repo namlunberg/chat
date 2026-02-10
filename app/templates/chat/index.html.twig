@@ -1,0 +1,39 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Главная страница чатов{% endblock %}
+
+{% block body %}
+    <h1>Главная страница чатов</h1>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Владелец</th>
+                <th>Дата создания</th>
+                <th>Дата изменения</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for chat in chats %}
+            <tr>
+                <td>{{ chat.id }}</td>
+                <td>{{ chat.owner.id }}</td>
+                <td>{{ chat.createdAt ? chat.createdAt|date('Y-m-d H:i:s') : '' }}</td>
+                <td>{{ chat.updatedAt ? chat.updatedAt|date('Y-m-d H:i:s') : '' }}</td>
+                <td>
+                    <a href="{{ path('app_chat_show', {'id': chat.id}) }}" class="btn btn-secondary">Просмотреть</a>
+                    <a href="{{ path('app_chat_edit', {'id': chat.id}) }}" class="btn btn-warning">Изменить</a>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4">no records found</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ path('app_chat_new') }}" class="btn btn-success">Создать новый чат</a>
+{% endblock %}

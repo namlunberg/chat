@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Главная страница сообщений{% endblock %}
+
+{% block body %}
+    <h1>Главная страница сообщений</h1>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Связанный чат</th>
+                <th>Владелец</th>
+                <th>Содержимое</th>
+                <th>Дата создания</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for message in messages %}
+            <tr>
+                <td>{{ message.id }}</td>
+                <td>{{ message.chat.id }}</td>
+                <td>{{ message.sender.id }}</td>
+                <td>{{ message.content }}</td>
+                <td>{{ message.createdAt ? message.createdAt|date('Y-m-d H:i:s') : '' }}</td>
+                <td>
+                    <a href="{{ path('app_message_show', {'id': message.id}) }}" class="btn btn-secondary">Просмотреть</a>
+                    <a href="{{ path('app_message_edit', {'id': message.id}) }}" class="btn btn-warning">Изменить</a>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4">no records found</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ path('app_message_new') }}" class="btn btn-success">Создать новое сообщение</a>
+{% endblock %}

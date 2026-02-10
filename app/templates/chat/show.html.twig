@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Чат{% endblock %}
+
+{% block body %}
+<h1>Чат</h1>
+
+<table class="table">
+    <tbody>
+        <tr>
+            <th>Id</th>
+            <td>{{ chat.id }}</td>
+        </tr>
+        <tr>
+            <th>Дата создания</th>
+            <td>{{ chat.createdAt ? chat.createdAt|date('Y-m-d H:i:s') : '' }}</td>
+        </tr>
+        <tr>
+            <th>Дата изменения</th>
+            <td>{{ chat.updatedAt ? chat.updatedAt|date('Y-m-d H:i:s') : '' }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="d-inline-flex flex-column mb-3 row-gap-2">
+    <a href="{{ path('app_chat_index') }}" class="btn btn-primary">Вернуться к списку</a>
+
+    <a href="{{ path('app_chat_edit', {'id': chat.id}) }}" class="btn btn-warning">Изменить</a>
+</div>
+
+
+{{ include('chat/_delete_form.html.twig') }}
+{% endblock %}

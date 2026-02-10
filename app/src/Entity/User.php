@@ -37,7 +37,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?string $password = null;
 
-    #[ORM\OneToMany(targetEntity: Chat::class, mappedBy: 'user', orphanRemoval: true)]
+    /**
+     * @var Collection<int, Chat>
+     */
+    #[ORM\OneToMany(targetEntity: Chat::class, mappedBy: 'owner', orphanRemoval: true)]
     private Collection $chats;
 
     /**
@@ -116,31 +119,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getChats(): Collection
-    {
-        return $this->chats;
-    }
-
-    public function addChat(Chat $chat): static
-    {
-        if (!$this->chats->contains($chat)) {
-            $chat->setUser($this);
-            $this->chats->add($chat);
-        }
-
-        return $this;
-    }
-
-    public function removeChat(Chat $chat): static
-    {
-        if ($this->chats->removeElement($chat)) {
-            if ($chat->getUser() === $this) {
-                $chat->setUser(null);
-            }
-        }
-
-        return $this;
-    }
 
     /**
      * Ensure the session doesn't contain actual password hashes by CRC32C-hashing them, as supported since Symfony 7.3.
@@ -151,6 +129,36 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $data["\0" . self::class . "\0password"] = hash('crc32c', $this->password);
 
         return $data;
+    }
+
+    /**
+     * @return Collection<int, Chat>
+     */
+    public function getChats(): Collection
+    {
+        return $this->chats;
+    }
+
+    public function addChat(Chat $chat): static
+    {
+        if (!$this->chats->contains($chat)) {
+            $this->chats->add($chat);
+            $chat->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removeChat(Chat $chat): static
+    {
+        if ($this->chats->removeElement($chat)) {
+            // set the owning side to null (unless already changed)
+            if ($chat->getOwner() === $this) {
+                $chat->setOwner(null);
+            }
+        }
+
+        return $this;
     }
 
     /**

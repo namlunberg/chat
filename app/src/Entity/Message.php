@@ -5,7 +5,9 @@ namespace App\Entity;
 use App\Repository\MessageRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use DateTimeImmutable;
 
+#[ORM\HasLifecycleCallbacks] 
 #[ORM\Entity(repositoryClass: MessageRepository::class)]
 class Message
 {
@@ -26,7 +28,7 @@ class Message
     private ?string $content = null;
 
     #[ORM\Column]
-    private ?\DateTimeImmutable $create_at = null;
+    private ?\DateTimeImmutable $created_at = null;
 
     public function getId(): ?int
     {
@@ -69,15 +71,21 @@ class Message
         return $this;
     }
 
-    public function getCreateAt(): ?\DateTimeImmutable
+    public function getCreatedAt(): ?\DateTimeImmutable
     {
-        return $this->create_at;
+        return $this->created_at;
     }
 
-    public function setCreateAt(\DateTimeImmutable $create_at): static
+    public function setCreatedAt(\DateTimeImmutable $created_at): static
     {
-        $this->create_at = $create_at;
+        $this->created_at = $created_at;
 
         return $this;
+    }
+
+    #[ORM\PrePersist]
+    public function setCreatedAtValue(): void
+    {
+        $this->created_at = new DateTimeImmutable();
     }
 }

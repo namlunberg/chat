@@ -1,0 +1,13 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Добавить сообщение{% endblock %}
+
+{% block body %}
+    <h1>Добавить сообщение</h1>
+
+    {{ include('message/_form.html.twig', {'button_label': 'Изменить'}) }}
+
+    <a href="{{ path('app_message_index') }}" class="btn btn-primary d-inline-block mb-3">Вернуться к списку</a>
+
+    {{ include('message/_delete_form.html.twig') }}
+{% endblock %}
