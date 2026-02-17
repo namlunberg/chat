@@ -18,16 +18,16 @@ class MessageType extends AbstractType
             ->add('content', options: [
                 'label' => 'Содержимое'
             ])
-            ->add('chat', EntityType::class, [
-                'class' => Chat::class,
-                'choice_label' => 'id',
-                'label' => 'Чат'
-            ])
-            ->add('sender', EntityType::class, [
-                'class' => User::class,
-                'choice_label' => 'id',
-                'label' => 'Отправитель'
-            ])
+            // ->add('chat', EntityType::class, [
+            //     'class' => Chat::class,
+            //     'choice_label' => 'id',
+            //     'label' => 'Чат'
+            // ])
+            // ->add('sender', EntityType::class, [
+            //     'class' => User::class,
+            //     'choice_label' => 'id',
+            //     'label' => 'Отправитель'
+            // ])
         ;
     }
 

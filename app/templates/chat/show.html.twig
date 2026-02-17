@@ -5,22 +5,40 @@
 {% block body %}
 <h1>Чат</h1>
 
-<table class="table">
-    <tbody>
-        <tr>
-            <th>Id</th>
-            <td>{{ chat.id }}</td>
-        </tr>
-        <tr>
-            <th>Дата создания</th>
-            <td>{{ chat.createdAt ? chat.createdAt|date('Y-m-d H:i:s') : '' }}</td>
-        </tr>
-        <tr>
-            <th>Дата изменения</th>
-            <td>{{ chat.updatedAt ? chat.updatedAt|date('Y-m-d H:i:s') : '' }}</td>
-        </tr>
-    </tbody>
-</table>
+<div class="card mb-5" style="height: 400px; overflow-y: scroll;">
+    <div class="card-body">
+        {% for message in messages %}
+        <div class="d-flex justify-content-start mb-3">
+            <div class="bg-light p-3 rounded" style="max-width: 75%;">
+                <div class="mb-1">{{ message.content }}</div>
+                <div class="d-flex justify-content-end align-items-center">
+                    <div class="text-muted small" title="123">
+                        {{ message.createdAt|date('H:i') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        <!-- <div class="d-flex justify-content-start mb-3">
+            <div class="bg-light p-3 rounded">
+                Привет! Как дела?
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mb-3">
+            <div class="bg-primary text-white p-3 rounded">
+                Всё отлично, работаю над проектом.
+            </div>
+        </div> -->
+    </div>
+</div>
+
+
+{{ include('message/_form.html.twig') }}
+
+<!-- <div class="input-group mt-3">
+    <input type="text" class="form-control" placeholder="Введите сообщение...">
+    <button class="btn btn-primary">Отправить</button>
+</div> -->
 
 <div class="d-inline-flex flex-column mb-3 row-gap-2">
     <a href="{{ path('app_chat_index') }}" class="btn btn-primary">Вернуться к списку</a>

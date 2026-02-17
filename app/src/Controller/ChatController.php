@@ -3,10 +3,13 @@
 namespace App\Controller;
 
 use App\Entity\Chat;
+use App\Entity\Message;
 use App\Form\ChatType;
+use App\Form\MessageType;
 use App\Repository\ChatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Filesystem\Path;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -26,27 +29,31 @@ final class ChatController extends AbstractController
     public function new(Request $request, EntityManagerInterface $entityManager): Response
     {
         $chat = new Chat();
-        $form = $this->createForm(ChatType::class, $chat);
-        $form->handleRequest($request);
+        $user = $this->getUser();
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $entityManager->persist($chat);
-            $entityManager->flush();
+        $chat->setOwner($user);
+        $entityManager->persist($chat);
+        $entityManager->flush();
 
-            return $this->redirectToRoute('app_chat_index', [], Response::HTTP_SEE_OTHER);
-        }
-
-        return $this->render('chat/new.html.twig', [
-            'chat' => $chat,
-            'form' => $form,
-        ]);
+        return $this->redirectToRoute('app_chat_show', ['id' => $chat->getId()], Response::HTTP_SEE_OTHER);
     }
 
     #[Route('/{id}', name: 'app_chat_show', methods: ['GET'])]
-    public function show(Chat $chat): Response
+    public function show(Request $request, Chat $chat): Response
     {
+        $message = new Message();
+        $messages = $chat->getMessages()->toArray();
+
+        $form = $this->createForm(MessageType::class, $message, [
+            'action' => $this->generateUrl('app_message_new', [
+                'chatId' => $chat->getId()
+            ])
+        ]);
+
         return $this->render('chat/show.html.twig', [
             'chat' => $chat,
+            'messages' => $messages,
+            'form' => $form
         ]);
     }
 
@@ -71,7 +78,7 @@ final class ChatController extends AbstractController
     #[Route('/{id}', name: 'app_chat_delete', methods: ['POST'])]
     public function delete(Request $request, Chat $chat, EntityManagerInterface $entityManager): Response
     {
-        if ($this->isCsrfTokenValid('delete'.$chat->getId(), $request->getPayload()->getString('_token'))) {
+        if ($this->isCsrfTokenValid('delete' . $chat->getId(), $request->getPayload()->getString('_token'))) {
             $entityManager->remove($chat);
             $entityManager->flush();
         }

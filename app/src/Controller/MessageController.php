@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Chat;
 use App\Entity\Message;
 use App\Form\MessageType;
 use App\Repository\MessageRepository;
@@ -26,14 +27,21 @@ final class MessageController extends AbstractController
     public function new(Request $request, EntityManagerInterface $entityManager): Response
     {
         $message = new Message();
+        $user = $this->getUser();
+        $chatId = $request->query->get('chatId');
+        $chat = $entityManager->getRepository(Chat::class)->find($chatId);
+
         $form = $this->createForm(MessageType::class, $message);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $message->setSender($user);
+            $message->setChat($chat);
+
             $entityManager->persist($message);
             $entityManager->flush();
 
-            return $this->redirectToRoute('app_message_index', [], Response::HTTP_SEE_OTHER);
+            return $this->redirectToRoute('app_chat_show', ['id' => $chat->getId()], Response::HTTP_SEE_OTHER);
         }
 
         return $this->render('message/new.html.twig', [
