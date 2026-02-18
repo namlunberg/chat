@@ -9,23 +9,33 @@ use App\Form\MessageType;
 use App\Repository\ChatRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Filesystem\Path;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/chat')]
 final class ChatController extends AbstractController
 {
     #[Route(name: 'app_chat_index', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
     public function index(ChatRepository $chatRepository): Response
     {
+        $user = $this->getUser();
+
+        if (in_array('ROLE_SUPPORT', $user->getRoles())) {
+            $chats = $chatRepository->findAll();
+        } else {
+            $chats = $chatRepository->findBy(['owner' => $user]);
+        }
+
         return $this->render('chat/index.html.twig', [
-            'chats' => $chatRepository->findAll(),
+            'chats' => $chats,
         ]);
     }
 
     #[Route('/new', name: 'app_chat_new', methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_USER')]
     public function new(Request $request, EntityManagerInterface $entityManager): Response
     {
         $chat = new Chat();
@@ -39,6 +49,7 @@ final class ChatController extends AbstractController
     }
 
     #[Route('/{id}', name: 'app_chat_show', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
     public function show(Request $request, Chat $chat): Response
     {
         $message = new Message();
@@ -58,6 +69,7 @@ final class ChatController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'app_chat_edit', methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_USER')]
     public function edit(Request $request, Chat $chat, EntityManagerInterface $entityManager): Response
     {
         $form = $this->createForm(ChatType::class, $chat);
@@ -76,6 +88,7 @@ final class ChatController extends AbstractController
     }
 
     #[Route('/{id}', name: 'app_chat_delete', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
     public function delete(Request $request, Chat $chat, EntityManagerInterface $entityManager): Response
     {
         if ($this->isCsrfTokenValid('delete' . $chat->getId(), $request->getPayload()->getString('_token'))) {
